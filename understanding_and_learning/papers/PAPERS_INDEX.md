@@ -386,4 +386,4 @@ Track your progress:
 ---
 
 **Last Updated**: November 24, 2025  
-**Maintainer**: AI Teaching Assistant
+**Maintainer**: Fnu Ashutosh

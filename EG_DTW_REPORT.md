@@ -420,19 +420,6 @@ EAC-DTW successfully bridges this gap by making the constraint parameter a funct
 
 The implications extend beyond ECG classification. Any domain characterized by "bursty" time series—where information is concentrated in sparse events separated by noise—could benefit from this approach. This includes:
 
-- Seismic activity detection (P-wave vs background rumble)
-- Speech recognition (voiced vs. unvoiced segments)
-- Industrial equipment monitoring (bearing failure signatures)
-- Financial time series (high-volatility events)
-
-### 7.2 Limitations
-
-**Synthetic Data Constraint**: The current evaluation uses controlled synthetic signals. While this enables reproducible experiments and precise noise control, it does not capture the full complexity of real clinical ECG data, including:
-- Annotation noise and inter-observer variability
-- Rare arrhythmia morphologies not in the synthetic model
-- Multi-lead interactions and vectorcardiographic considerations
-- Patient-specific baseline wander and motion artifacts
-
 **Clinical Validation Required**: Before deployment in medical settings, validation on standard databases such as MIT-BIH Arrhythmia Database is essential. Access to real annotated data via the `wfdb` library would enable:
 - Testing on 48 half-hour recordings with diverse pathologies
 - Evaluation on rare beat types (fusion beats, paced rhythms)
@@ -626,22 +613,6 @@ def sigmoid_mapping(entropy_profile, w_min, w_max, k=1.0):
     # Sigmoid function
     sigmoid = 1 / (1 + np.exp(-k * (entropy_profile - mu_H)))
     # Scale to [w_min, w_max]
-    windows = w_min + (w_max - w_min) * sigmoid
-    return np.floor(windows).astype(int)
-
-def eac_dtw_distance(Q, C, w_min=2, w_max_percent=0.15, k=2.0):
-    """
-    Entropy-Adaptive Constraint Dynamic Time Warping.
-    
-    Implementation based on:
-    - Sakoe & Chiba (1978) for DTW recurrence
-    - Batista et al. (2011) for complexity-invariance principle
-    
-    Parameters:
-    -----------
-    Q : ndarray
-        Query signal
-    C : ndarray
         Candidate signal
     w_min : int
         Minimum window size (default: 2)

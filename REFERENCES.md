@@ -149,13 +149,3 @@ Pace University, New York, NY.
 ```
 
 ---
-
-## Academic Integrity Notes
-
-✅ **All baseline implementations properly cited**
-✅ **Synthetic vs. real data clearly distinguished**
-✅ **Algorithm positioning (vs. Soft-DTW) explicitly stated**
-✅ **Standard preprocessing techniques attributed (Pan-Tompkins)**
-✅ **Future validation requirements clearly specified (MIT-BIH)**
-
-**No plagiarism risks identified** - all code properly attributed to original methodological sources.
