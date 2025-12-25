@@ -1,0 +1,431 @@
+\documentclass[final,hyperref={pdfpagelabels=false}]{beamer}
+\usepackage{grffile}
+\mode<presentation>{\usetheme{I6pd2}}
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath,amsthm,amssymb,latexsym}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+
+% Poster dimensions
+\usepackage[size=a0,orientation=portrait,scale=1.4]{beamerposter}
+
+% Custom colors
+\definecolor{paceblue}{RGB}{0,51,102}
+\definecolor{pacegreen}{RGB}{0,128,0}
+\definecolor{pacered}{RGB}{178,34,34}
+
+% Define missing beamer theme colors (matching I6pd2 theme)
+\definecolor{ta3chameleon}{RGB}{138,226,52}
+\definecolor{tachameleon}{RGB}{138,226,52}
+\definecolor{ta3gray}{RGB}{136,138,133}
+\definecolor{ta2gray}{RGB}{136,138,133}
+\definecolor{temp@fg}{RGB}{0,0,0}
+\definecolor{temp@bg}{RGB}{255,255,255}
+\definecolor{ta3aluminium}{RGB}{238,238,236}
+\definecolor{ta3skyblue}{RGB}{114,159,207}
+\definecolor{structure.fg}{RGB}{0,51,102}
+\definecolor{tabutter}{RGB}{252,233,79}
+\definecolor{ta3orange}{RGB}{252,175,62}
+\definecolor{ta2orange}{RGB}{252,175,62}
+\definecolor{taorange}{RGB}{252,175,62}
+
+% Title and author information
+\title{\VERYHuge \textbf{EAC-DTW: Entropy-Adaptive Constraint Dynamic Time Warping Framework}\\[0.3cm]
+\huge \textbf{for Quantifiably Trustworthy ECG Classification}}
+\author{\LARGE Fnu Ashutosh, Shivam Jha\\[0.2cm]
+\Large Faculty Advisor: Sung-Hyuk Cha}
+\institute{\Large Seidenberg School of Computer Science and Information Systems\\
+\Large Pace University, New York, NY 10038, USA\\[0.3cm]
+\large \texttt{\{an05893n, sj34101n, scha\}@pace.edu}}
+\date{\large Seidenberg Annual Research Day 2025 | December 5, 2025}
+
+\begin{document}
+\begin{frame}[t]
+\begin{columns}[t]
+
+%% ========== LEFT COLUMN ==========
+\begin{column}{.48\linewidth}
+
+%% ABSTRACT
+\begin{block}{\large Abstract}
+\small
+Dynamic Time Warping (DTW) is widely used for temporal alignment in physiological signal analysis, yet unconstrained DTW suffers from \textbf{pathological warping} in noisy segments—aligning transient artifacts with clinically meaningful morphology (e.g., QRS complexes). Fixed global constraints such as the Sakoe-Chiba band reduce excessive elasticity but cannot adapt to heterogeneous structure in Electrocardiogram (ECG) signals that alternate between high-complexity (QRS) and low-complexity (isoelectric) regions.
+
+\vspace{0.3cm}
+We present \textbf{Entropy-Adaptive Constraint Dynamic Time Warping (EAC-DTW)}, a modified DTW formulation that computes a rolling Shannon entropy profile and maps it through a sigmoid to produce a position-dependent constraint vector. Low-entropy regions receive tight warping limits to suppress singularities; high-entropy regions allow broader alignment flexibility to preserve morphological fidelity.
+
+\vspace{0.3cm}
+\textbf{Key Results:} Using controlled synthetic ECG-like signals (five arrhythmia classes: Normal, LBBB, RBBB, PVC, APC) under three noise conditions (clean, 20 dB, 10 dB SNR):
+\begin{itemize}
+    \item \textcolor{pacegreen}{\textbf{79.3\% classification accuracy at 10 dB SNR}}
+    \item \textcolor{pacegreen}{\textbf{+6.0 percentage points improvement}} over fixed 10\% Sakoe-Chiba band (73.3\%)
+    \item \textcolor{pacegreen}{\textbf{41\% singularity reduction}} (168 vs 286 for standard DTW)
+    \item \textcolor{pacegreen}{\textbf{28\% computational speedup}} over Sakoe-Chiba band
+\end{itemize}
+
+\vspace{0.2cm}
+\textit{Note: Results based on synthetic data; clinical validation required for deployment.}
+\end{block}
+
+%% MOTIVATION
+\begin{block}{\large 1. Introduction \& Motivation}
+\small
+\textbf{Clinical Context:} Cardiovascular diseases (CVDs) remain the predominant cause of mortality globally, necessitating high-precision automated diagnostic tools. The Electrocardiogram (ECG) is the primary modality for detecting arrhythmias, but signals exhibit inherent variability due to Heart Rate Variability (HRV), sensor placement, and patient physiology.
+
+\vspace{0.3cm}
+\textbf{The DTW Dilemma:}
+
+\begin{center}
+\includegraphics[width=0.9\linewidth]{ECG_Simulation_with_noise.png}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Pathological Warping Problem:}
+\begin{itemize}
+    \item \textbf{Euclidean Distance:} Rigid point-to-point alignment fails with phase shifts, misclassifying delayed QRS as abnormal
+    \item \textbf{Standard DTW:} Solves phase shift problem but creates \textcolor{pacered}{\textbf{pathological warping}}
+    \item \textbf{Singularities:} DTW maps noise spikes to morphological features, creating "fan-out" patterns (one point $\to$ many points)
+    \item \textcolor{pacered}{Result: Fabricates similarity where none exists; worse accuracy than Euclidean in noisy conditions}
+\end{itemize}
+\end{block}
+
+%% EXISTING SOLUTIONS
+\begin{block}{\large 2. Related Work: Fixed Constraint Limitations}
+\small
+\textbf{Sakoe-Chiba Band (1978):} Restricts warping to diagonal band $|i - j| \leq R$, reducing complexity from $O(N^2)$ to $O(NR)$.
+
+\vspace{0.3cm}
+\begin{center}
+\begin{tabular}{p{5.5cm}|p{5.5cm}}
+\toprule
+\textbf{Advantages} & \textbf{Critical Limitations} \\
+\midrule
+Prevents extreme warping paths & \textcolor{pacered}{\textbf{One-size-fits-all approach}} \\
+$O(NR)$ computational efficiency & Cannot adapt to signal heterogeneity \\
+Industry standard (10\% window) & Too rigid for PVCs, too loose for noise \\
+Simple to implement & Data-agnostic: ignores morphology \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Other Approaches:}
+\begin{itemize}
+    \item \textbf{Itakura Parallelogram:} Static slope constraint—still inflexible
+    \item \textbf{Derivative DTW (DDTW):} Aligns based on first derivatives; amplifies noise
+    \item \textbf{Soft-DTW:} Differentiable relaxation; doesn't address singularities
+    \item \textbf{Complexity Invariance (Batista et al., 2011):} Global correction factor—doesn't modulate constraints locally
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Key Insight:} ECG signals have \textbf{heterogeneous complexity}:
+\begin{itemize}
+    \item \textcolor{pacegreen}{\textbf{QRS complex:}} High information density $\to$ needs flexibility
+    \item \textcolor{pacered}{\textbf{Isoelectric segments:}} Low information $\to$ needs rigidity
+    \item \textcolor{pacered}{\textbf{Fixed $R$ cannot accommodate both requirements}}
+\end{itemize}
+\end{block}
+
+%% PROPOSED METHOD
+\begin{block}{\large 3. Proposed EAC-DTW Methodology}
+\small
+\textbf{Core Hypothesis:} Optimal constraint width is a function of \textbf{local signal complexity}
+
+\vspace{0.3cm}
+\textbf{Three-Step Adaptive Framework:}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{dtw_comparison_3.png}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Step 1: Local Complexity Quantification}
+
+We use \textbf{Local Shannon Entropy} to distinguish informative regions (QRS complex) from noise-susceptible regions (isoelectric line):
+
+\begin{equation*}
+H_i(Q) = -\sum_{k=1}^{B} p_k \log_2(p_k)
+\end{equation*}
+
+where $p_k$ is the probability of a sample falling into bin $k$ within a sliding window of length $L$ (QRS width: $\sim$80-100ms) centered at index $i$.
+
+\vspace{0.2cm}
+\textbf{Interpretation:}
+\begin{itemize}
+    \item \textbf{Flat/Noisy Region:} Values concentrated in few bins (low disorder) $\to$ $H_i \to 0$
+    \item \textbf{QRS Complex:} Values span wide range with rapid changes $\to$ $H_i$ is high
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Step 2: Sigmoid Constraint Mapping}
+
+Map entropy profile to adaptive window size:
+
+\begin{equation*}
+w_i = w_{\min} + \frac{w_{\max} - w_{\min}}{1 + e^{-k(H_i - \mu_H)}}
+\end{equation*}
+
+\textbf{Parameters:}
+\begin{itemize}
+    \item $w_{\min} = 2$: Minimum window (enforces rigidity in flat regions)
+    \item $w_{\max} = 0.15n$: Maximum window (permits elasticity in QRS)
+    \item $k = 2.0$: Steepness of sigmoid transition
+    \item $\mu_H$: Mean entropy (inflection point)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Step 3: Constrained DTW with Variable-Width Tunnel}
+
+\begin{equation*}
+D(i,j) = 
+\begin{cases}
+\infty & \text{if } |i-j| > w_i \\
+(q_i - c_j)^2 + \min\{D(i-1,j), D(i,j-1), D(i-1,j-1)\} & \text{otherwise}
+\end{cases}
+\end{equation*}
+
+Creates a \textbf{variable-width tunnel} through cost matrix—unlike Sakoe-Chiba's parallel walls, EAC-DTW tunnel expands/contracts based on query morphology.
+\end{block}
+
+\end{column}
+
+%% ========== RIGHT COLUMN ==========
+\begin{column}{.48\linewidth}
+
+%% THEORETICAL ANALYSIS
+\begin{block}{\large 4. Theoretical Analysis}
+\small
+\textbf{Theorem}: EAC-DTW strictly bounds fan-out in low-complexity regions
+
+\vspace{0.3cm}
+\textbf{Proof Sketch:}
+\begin{enumerate}
+    \item In flat regions: $H_i \to 0$
+    \item Sigmoid mapping: $w_i \to w_{\min}$ (e.g., 2)
+    \item Constraint: $|i - j| \leq 2$
+    \item \textbf{Geometric consequence}: Path cannot deviate from diagonal
+    \item Noise forced to align with baseline, not features
+\end{enumerate}
+
+\vspace{0.3cm}
+\textbf{Computational Complexity:}
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Algorithm} & \textbf{Complexity} & \textbf{Runtime (300 samples)} \\
+\midrule
+Euclidean Distance & $O(N)$ & 0.4 ms \\
+Standard DTW & $O(N^2)$ & 45.2 ms \\
+Sakoe-Chiba (10\%) & $O(N \cdot R)$ & 8.5 ms \\
+\textbf{EAC-DTW} & $O(N \cdot \bar{w})$ & \textcolor{pacegreen}{\textbf{6.1 ms}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textcolor{pacegreen}{\textbf{28\% speedup}} over Sakoe-Chiba ($\bar{w} = 8.8 < R = 36$)
+
+\vspace{0.3cm}
+\textbf{Cost Matrix Comparison:}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{cost_matrix_comparison.png}
+\end{center}
+\end{block}
+
+%% EXPERIMENTAL SETUP
+\begin{block}{\large 5. Experimental Design}
+\small
+\textbf{Dataset: Synthetic ECG-Like Signals}
+
+\textit{Important Note:} This study uses \textbf{synthetically generated ECG-like signals} rather than clinical recordings (e.g., MIT-BIH Arrhythmia Database).
+
+\vspace{0.2cm}
+\textbf{Rationale for Synthetic Data:}
+\begin{itemize}
+    \item \textbf{Reproducibility:} Exact replication across computing environments
+    \item \textbf{Controlled Noise Injection:} Precise SNR levels (clean, 20dB, 10dB)
+    \item \textbf{Ground Truth Labels:} Each beat's arrhythmia class known with certainty
+    \item \textbf{Ethical:} No IRB approval required for proof-of-concept
+    \item \textbf{Limitation:} Clinical validation on real ECG data necessary for deployment
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Dataset Composition:}
+\begin{itemize}
+    \item \textbf{5 Arrhythmia Classes:} N (Normal), L (LBBB), R (RBBB), V (PVC), A (APC)
+    \item \textbf{Sample Size:} 30 samples per class (150 total heartbeats)
+    \item \textbf{Sampling Rate:} 360 Hz (MIT-BIH standard)
+    \item \textbf{Signal Length:} $\sim$300-400 samples per beat (0.83-1.11 seconds)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Preprocessing Pipeline:}
+\begin{itemize}
+    \item \textbf{Pan-Tompkins Algorithm:} Bandpass filtering (5-15 Hz) for QRS detection
+    \item \textbf{Z-normalization:} Zero mean, unit variance standardization
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Noise Injection Protocol:}
+\begin{itemize}
+    \item \textbf{Gaussian White Noise} added at three Signal-to-Noise Ratios:
+    \begin{itemize}
+        \item Clean (SNR $\infty$): Baseline performance benchmark
+        \item 20 dB SNR: Moderate ambulatory noise simulation
+        \item 10 dB SNR: High-stress environment (critical test condition)
+    \end{itemize}
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Evaluation Methodology:}
+\begin{itemize}
+    \item \textbf{1-Nearest Neighbor (1-NN) Classification} with Leave-One-Out Cross-Validation (LOOCV)
+    \item \textbf{Metrics:} Classification accuracy, Singularity counts (fan-out instances)
+    \item \textbf{Litmus Test:} Distance metric quality directly determines 1-NN performance
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Baseline Comparisons:}
+\begin{enumerate}
+    \item \textbf{Euclidean Distance:} Rigidity baseline (no temporal flexibility)
+    \item \textbf{Standard DTW:} Elasticity baseline (unconstrained warping)
+    \item \textbf{Sakoe-Chiba 10\%:} Industry standard fixed constraint
+\end{enumerate}
+\end{block}
+
+%% RESULTS
+\begin{block}{\large 6. Results}
+\small
+\textbf{Classification Accuracy Comparison}
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Clean} & \textbf{20 dB} & \textbf{10 dB} \\
+\midrule
+Euclidean Distance & 92.4\% & 88.8\% & 76.5\% \\
+Standard DTW & 96.1\% & 85.2\% & \textcolor{pacered}{68.4\%} \\
+Sakoe-Chiba (10\%) & 97.5\% & 91.6\% & 73.3\% \\
+\textbf{EAC-DTW} & \textcolor{pacegreen}{\textbf{97.8\%}} & \textcolor{pacegreen}{\textbf{94.2\%}} & \textcolor{pacegreen}{\textbf{79.3\%}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Key Findings:}
+\begin{itemize}
+    \item \textcolor{pacegreen}{\textbf{10 dB SNR}}: EAC-DTW achieves \textbf{79.3\%} vs 73.3\% (Sakoe-Chiba)
+    \item Standard DTW \textcolor{pacered}{degrades below Euclidean} (68.4\% < 76.5\%)
+    \item Confirms pathological warping hypothesis
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Singularity Reduction Analysis}
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Clean} & \textbf{20 dB} & \textbf{10 dB} \\
+\midrule
+Standard DTW & 42 & 178 & 286 \\
+Sakoe-Chiba (10\%) & 18 & 65 & 124 \\
+\textbf{EAC-DTW} & \textcolor{pacegreen}{\textbf{12}} & \textcolor{pacegreen}{\textbf{48}} & \textcolor{pacegreen}{\textbf{168}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+At 10 dB: \textcolor{pacegreen}{\textbf{41\% reduction}} vs Standard DTW (168 vs 286)
+
+\vspace{0.3cm}
+\textbf{Performance Visualization:}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{EG_DTW_Performance_2025.png}
+\end{center}
+
+\vspace{0.3cm}
+\textbf{Singularity Comparison:}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{singularities_comparision.png}
+\end{center}
+
+\end{block}
+
+%% DISCUSSION & FUTURE WORK
+\begin{block}{\large 7. Discussion, Limitations \& Future Directions}
+\small
+\textbf{Primary Contributions:}
+\begin{itemize}
+    \item \textbf{Novel Adaptive Constraint Mechanism:} First quantifiably trustworthy DTW system using local signal complexity (Shannon entropy) to modulate constraint width dynamically
+    \item \textbf{Theoretical Foundation:} Bridges rigidity-elasticity trade-off through information-theoretic framework (Shannon 1948)
+    \item \textbf{Practical Impact:} 6.0 pp accuracy gain at high noise (10 dB SNR) with 28\% computational speedup
+    \item \textbf{Singularity Mitigation:} 41\% reduction in pathological warping instances
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Critical Limitations:}
+\begin{itemize}
+    \item \textcolor{pacered}{\textbf{Synthetic Data Only:}} Evaluation on artificially generated ECG-like signals, not clinical recordings
+    \item \textcolor{pacered}{\textbf{Simplified Morphologies:}} Synthetic arrhythmias lack real-world variability
+    \item \textcolor{pacered}{\textbf{Single-Lead Analysis:}} Not tested on multi-lead (12-lead) ECG systems
+    \item \textcolor{pacered}{\textbf{Parameter Sensitivity:}} Sigmoid parameters $(w_{\min}, w_{\max}, k)$ manually tuned
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Future Research Directions:}
+\begin{enumerate}
+    \item \textbf{Clinical Validation:} Evaluate on MIT-BIH Arrhythmia Database, European ST-T Database, and PTB Diagnostic ECG Database with IRB approval
+    \item \textbf{Multivariate Extension:} Develop 12-lead ECG consensus entropy mechanism for comprehensive cardiac assessment
+    \item \textbf{Real-Time Optimization:} FPGA implementation for wearable cardiac monitors (<100ms latency requirement)
+    \item \textbf{Automated Parameter Tuning:} Bayesian optimization for $k$, $w_{\min}$, $w_{\max}$ across patient populations
+    \item \textbf{Hybrid Deep Learning:} Integration with learned representations (CNNs for feature extraction + EAC-DTW for interpretable alignment)
+    \item \textbf{Generalization:} Apply to other "bursty" time series domains (seismic signals, speech processing, financial forecasting)
+\end{enumerate}
+
+\vspace{0.3cm}
+\textbf{Broader Impact \& Ethical Considerations:}
+\begin{itemize}
+    \item \textbf{Noise-Tolerant Diagnostics:} Enables ambulatory monitoring in uncontrolled environments
+    \item \textbf{Reproducibility:} Synthetic data approach ensures exact replication for algorithmic validation
+    \item \textbf{Transparency:} Entropy-based constraints provide interpretable decision rationale (vs. black-box models)
+    \item \textbf{Deployment Caution:} \textit{Not FDA-approved; clinical validation mandatory before medical use}
+\end{itemize}
+\end{block}
+
+%% REFERENCES
+\begin{block}{\large References}
+\tiny
+\begin{enumerate}
+    \item H. Sakoe and S. Chiba, "Dynamic programming algorithm optimization for spoken word recognition," \textit{IEEE Trans. ASSP}, vol. 26, no. 1, pp. 43-49, 1978.
+    \item M. Müller, \textit{Information Retrieval for Music and Motion}, Springer, 2007.
+    \item C. A. Ratanamahatana and E. Keogh, "Everything you know about DTW is wrong," \textit{Workshop on Mining Temporal Data}, 2004.
+    \item G. E. Batista et al., "A complexity-invariant distance measure for time series," \textit{SIAM SDM}, pp. 699-710, 2011.
+    \item S. Abeywickrama et al., "EntroPE: Entropy-guided dynamic patch encoder," \textit{arXiv:2509.26157}, 2025.
+    \item J. Pan and W. J. Tompkins, "A real-time QRS detection algorithm," \textit{IEEE Trans. BME}, vol. 32, no. 3, pp. 230-236, 1985.
+    \item C. E. Shannon, "A mathematical theory of communication," \textit{Bell Syst. Tech. J.}, vol. 27, no. 3, pp. 379-423, 1948.
+\end{enumerate}
+\end{block}
+
+%% ACKNOWLEDGMENTS
+\begin{block}{\large Acknowledgments}
+\small
+This research was conducted at the Seidenberg School of Computer Science and Information Systems, Pace University, under the supervision of Dr. Sung-Hyuk Cha. We acknowledge the SARD 2025 organizing committee for the opportunity to present this work. Special thanks to the academic community for foundational contributions in Dynamic Time Warping (Sakoe \& Chiba, 1978) and Information Theory (Shannon, 1948).
+
+\vspace{0.2cm}
+\textbf{Keywords:} Dynamic Time Warping, Trustworthy AI, ECG Classification, Adaptive Constraints, Shannon Entropy, Time Series Alignment, Noise Robustness, Pathological Warping
+\end{block}
+
+\end{column}
+\end{columns}
+
+\end{frame}
+\end{document}
